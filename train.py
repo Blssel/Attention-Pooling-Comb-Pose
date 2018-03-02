@@ -70,6 +70,8 @@ def main():
       batch_queue=slim.prefetch_queue.prefetch_queue([images,pose_labels_hmap,pose_labels_valid,action_labels],
                                                       capacity=5*deploy_config.clones.cfg.TRAIN.ITER_SIZE)
       
+
+
     # ------------------------------选择网络?????------------------------------#
     def clone_fn(batch_queue):
       # 出队一个batch
@@ -98,7 +100,7 @@ def main():
     # 收集summary
     summaries=set(tf.get_collection(tf.GRAPH.SUMMARIES))
 
-    # clone是对输出和名称空间的封装
+    # clone是对输出和名称nz空间的封装
     clones=model_deploy.creat_clones(deploy_config,clone_fn,[batch_queue])
     first_clone_scope=deploy_config.clone_scope(0)
     update_ops=tf.get_collection(tf.GraphKeys.UPDATE_OPS,first_clone_scope)
@@ -107,40 +109,39 @@ def main():
     from nets import nets_factory
     network_fn=net_factory.get_network_fn(cfg.MODEL_NAME,num_calsses=,num)#该函数作者又重新写过
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    # 为每一个end_point节点加入监控
+    for end_point in end_points:
+      x= end_points[end_point]
+      summaries.add(tf.summary.histogram('activations/'+ end_point, x))
     
-  
-  
+    # 加入图片summary
+    sum_img=tf.concat(tf.unstack(end_points['Image']))  # unstack作用是取消堆叠，也就是一帧一帧零散出来，用list包裹  concat感觉像是将所有图片按空间拼接起来，方便看每一帧
+    if sum_img.get_shape().as_list()[-1] not in [1, 3, 4]:
+      # 再做点处理  还不太懂？？？？？？？
+    # 加入summary
+    summaries.add(tf.summary.image('images',sum_img))
+    
+    # 加入由于加入pose而导致模型中新增的endpoi
+    for epname in cfg.TRAIN.OTHER_IMG_SUMMARY_TO_ADD:    # OTHER_IMG_SUMMARIES_TO_ADD = ['PosePrelogitsBasedAttention']
+      if epname in end_points:
+        summary.add(tf.summary.image('image_vis/'+ epname, end_points[epname]))
+    
+    summaries=summaries.union()   # 求summaries和参数的并集，还赋给summaries？？？？？？？
+
+    # 为loss增加summaries
+    for loss in tf.get_collection(tf.Graphkeys.LOSSES,first_clone_scope):
+      summaries.add(tf.summary.scalar(tensor=loss,name='losses/%s'% loss.op.name))
+    
+    # 为变量增加summies
+    for variable in slim.get_model_variables():
+      summaries.add(tf.summary.histogram(variable.op.name, variable))
+
+    # 配置滑动平均 (moving average)
+
+
+
+
+
+
+
+
