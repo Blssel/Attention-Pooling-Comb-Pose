@@ -1,6 +1,67 @@
 import argparse
 import os
 
+# 获取所有需要训练的变量（保存在list中）
+def _get_variables_to_train():
+  if cfg.TRAIN.TRAINABLE_SCOPES == '':
+    return tf.trainable_variables()
+  else:
+    # 将cfg中定义的所有需要涵盖可训练变量的scope都取出来
+    scopes=[scope.strip() for scope in cfg.TRAIN.TRAINABLE_SCOPES.split(',')]
+  # 获得这些scope下的变量
+  variables_to_train=[]
+  for scope in scopes:
+    variables=tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,scope)
+    variables_to_train.append(variable)
+
+  return variables_to_train
+    
+  
+
+def _configure_optimizer(learning_rate):
+  if cfg.TRAIN.OPTIMIZER == 'adam':
+
+  # 如果是momentum的优化方式
+  elif cfg.TRAIN.OPTIMIZER == 'momentum':
+    optimizer=tf.train.MomentumOptimizer(learning_rate,
+                                        momentum=cfg.TRAIN.MOMENTUM,
+                                        name='Momentum')
+
+  elif cfg.TRAIN.OPTIMIZER == 'rmsprop':
+
+  elif cfg.TRAIN.OPTIMIZER == 'sgd':
+
+  else:
+    raise ValueError('Optimizer [%s] was not recognized',cfg.TRAIN.OPTIMIZER)
+
+  return optimizer
+
+def _configure_learning_rate(num_samples_per_epoch,num_clones,global_step):
+  if cfg.NUM_STEPS_PER_DECAY>0:
+    # 设置下降的步长
+    decay_steps=cfg.NUM_STEPS_PER_DECAY
+    tf.logging.info('Using {} steps for decay. Ignoring any epoch setting for '
+                    'decay.'.format(decay_steps))
+  else:
+    # 如果没有在cfg中给出的话，则手动算！！！！为何这么算？？？？？？？？？
+    decay_steps= int(num_samples_per_epoch / (cfg.TRAIN.BATCH_SIZE * num_clones * cfg.TRAIN.ITER_SIZE) * cfg.TRAIN.NUM_EPOCHS_PER_DECAY)
+  
+  # 选择衰减方式
+  if cfg.TRAIN.LEARNING_RATE_DECAY_TYPE== 'exponential'
+    return tf.train.exponential_decay(cfg.TRAIN.LEARNING_RATE,
+                                      global_step,
+                                      decay_steps,
+                                      cfg.TRAIN.LEARNING_RATE_DECAY_RATE,
+                                      staircase=True,
+                                      name='exponential_decay_learning_rate')
+  elif cfg.TRAIN.LEARNING_RATE_DECAY_TYPE == 'fixed': #其它两种衰减方式
+
+  elif cfg.TRAIN.LEARNING_RATE_DECAY_TYPE == 'polynomial':
+
+  else:
+    raise ValueError('learning_rate_decay_type [%s] was not recognized',cfg.TRAIN.LEARNING_RATE_DECAY_RATE)
+
+
 def parse_args():
   parser=argparse.ArgumentParser(description='Train a keypoint regressor.')
   parser.add('--cfg',dest='cfg_file',help='optional config file',default=None,type=str)
@@ -137,6 +198,18 @@ def main():
       summaries.add(tf.summary.histogram(variable.op.name, variable))
 
     # 配置滑动平均 (moving average)
+
+    # 配置优化程序
+    with tf.device(deploy_config.optimizer_device()):
+      # 设置学习率
+      learning_rate= _configure_learning_rate(dataset.num_samples, num_clones, global_step)
+      # 
+      optimizer=_configure_optimizer(learning_rate)
+      summaries.add(tf.summary.scalar(tensor=learning_rate,name='learning_rate'))
+
+    # 设置哪些变量需要参与训练
+    variables_to_train=_get_variables_to_train()
+    
 
 
 
